@@ -49,6 +49,20 @@ export const BriefingCard: React.FC<BriefingCardProps> = ({ briefing, isLatest =
     return map[category] || category.replace('_', ' ').toUpperCase();
   };
 
+  const sanitizeHtmlText = (text: string) => {
+    if (!text) return '';
+    return text
+      .replace(/<[^>]*>/g, '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+  };
+
   const copyAsMemo = () => {
     const text = `☕ *STARBUCKS USA COMPETITIVE INTELLIGENCE DISPATCH*
 Issue: Vol. ${briefing.volumeNumber} • ${briefing.displayDate}
@@ -124,13 +138,13 @@ ${briefing.keyTakeaway}
         <p className="text-xs font-medium text-emerald-400/90 tracking-wide uppercase mb-1">
           {briefing.displayDate}
         </p>
-        <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight leading-snug mb-4">
-          {briefing.headline}
+        <h2 className="text-2xl sm:text-3xl font-serif font-bold text-white tracking-tight leading-snug mb-4 break-words [overflow-wrap:anywhere]">
+          {sanitizeHtmlText(briefing.headline)}
         </h2>
 
         {/* Narrative Executive Summary */}
-        <div className="prose prose-invert max-w-none text-neutral-300 text-sm sm:text-base leading-relaxed bg-[#0b100d]/60 p-4 sm:p-5 rounded-2xl border border-[#1b2820]">
-          <p>{briefing.executiveSummary}</p>
+        <div className="prose prose-invert max-w-none text-neutral-300 text-sm sm:text-base leading-relaxed bg-[#0b100d]/60 p-4 sm:p-5 rounded-2xl border border-[#1b2820] break-words [overflow-wrap:anywhere]">
+          <p>{sanitizeHtmlText(briefing.executiveSummary)}</p>
         </div>
       </div>
 
@@ -152,7 +166,7 @@ ${briefing.keyTakeaway}
           {briefing.insights.map((insight) => (
             <div
               key={insight.id}
-              className="group relative bg-[#0e1612] hover:bg-[#121c16] rounded-2xl p-5 sm:p-6 border border-[#202f26] hover:border-emerald-600/40 transition-all duration-200 shadow-sm"
+              className="group relative bg-[#0e1612] hover:bg-[#121c16] rounded-2xl p-5 sm:p-6 border border-[#202f26] hover:border-emerald-600/40 transition-all duration-200 shadow-sm overflow-hidden"
             >
               {/* Insight Header */}
               <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -180,13 +194,13 @@ ${briefing.keyTakeaway}
               </div>
 
               {/* Title */}
-              <h4 className="text-base sm:text-lg font-semibold text-white mb-3 group-hover:text-emerald-300 transition-colors">
-                {insight.title}
+              <h4 className="text-base sm:text-lg font-semibold text-white mb-3 group-hover:text-emerald-300 transition-colors break-words [overflow-wrap:anywhere]">
+                {sanitizeHtmlText(insight.title)}
               </h4>
 
               {/* What Happened (Summary) */}
-              <p className="text-sm text-neutral-300 leading-relaxed mb-4">
-                {insight.summary}
+              <p className="text-sm text-neutral-300 leading-relaxed mb-4 break-words [overflow-wrap:anywhere]">
+                {sanitizeHtmlText(insight.summary)}
               </p>
 
               {/* Strategic Teardown: Why SBUX Should Care & Counter Action */}

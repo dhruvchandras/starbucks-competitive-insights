@@ -8,17 +8,27 @@ export interface RawArticle {
 }
 
 /**
- * Clean HTML entities and tags from RSS feed text
+ * Thoroughly clean HTML tags, entities, and excessive whitespace from RSS text
  */
-function cleanText(text: string): string {
+function cleanHtmlAndEntities(text: string): string {
+  if (!text) return '';
   return text
-    .replace(/<[^>]*>?/gm, '')
+    // 1. Decode common XML / HTML entities
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    // 2. Strip all HTML tags
+    .replace(/<[^>]*>/g, '')
+    // 3. Clean up any remaining entities
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    // 4. Normalize whitespace
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -41,22 +51,48 @@ function parseGoogleNewsRss(xmlText: string, competitorName: string): RawArticle
     const sourceMatch = /<source[^>]*>([\s\S]*?)<\/source>/i.exec(itemContent);
 
     if (titleMatch && linkMatch) {
-      let rawTitle = cleanText(titleMatch[1]);
-      let sourceName = sourceMatch ? cleanText(sourceMatch[1]) : '';
+      let rawTitle = cleanHtmlAndEntities(titleMatch[1]);
+      let sourceName = sourceMatch ? cleanHtmlAndEntities(sourceMatch[1]) : '';
 
-      // Google News title usually ends with "- Source Name"
-      if (!sourceName && rawTitle.includes(' - ')) {
-        const parts = rawTitle.split(' - ');
-        sourceName = parts.pop()?.trim() || 'Industry Source';
-        rawTitle = parts.join(' - ').trim();
+      // Always strip trailing " - Source Name" or " | Source Name" from rawTitle
+      if (rawTitle.includes(' - ')) {
+        const lastDashIdx = rawTitle.lastIndexOf(' - ');
+        const possibleSource = rawTitle.slice(lastDashIdx + 3).trim();
+        if (!sourceName) {
+          sourceName = possibleSource;
+        }
+        rawTitle = rawTitle.slice(0, lastDashIdx).trim();
+      } else if (rawTitle.includes(' | ')) {
+        const lastPipeIdx = rawTitle.lastIndexOf(' | ');
+        const possibleSource = rawTitle.slice(lastPipeIdx + 3).trim();
+        if (!sourceName) {
+          sourceName = possibleSource;
+        }
+        rawTitle = rawTitle.slice(0, lastPipeIdx).trim();
+      }
+
+      if (!sourceName) sourceName = 'Industry Press';
+
+      // Clean snippet and ensure it doesn't just duplicate the title/source or have raw HTML remnants
+      let cleanSnippet = descMatch ? cleanHtmlAndEntities(descMatch[1]) : '';
+      const snippetLower = cleanSnippet.toLowerCase();
+      const titleLower = rawTitle.toLowerCase();
+      if (
+        snippetLower === titleLower ||
+        snippetLower.startsWith(titleLower) ||
+        snippetLower.length < 25 ||
+        snippetLower.includes('http') ||
+        snippetLower.includes('<a')
+      ) {
+        cleanSnippet = '';
       }
 
       articles.push({
         title: rawTitle,
         link: linkMatch[1].trim(),
-        source: sourceName || 'Industry Press',
+        source: sourceName,
         pubDate: pubDateMatch ? pubDateMatch[1].trim() : new Date().toISOString(),
-        snippet: descMatch ? cleanText(descMatch[1]) : '',
+        snippet: cleanSnippet,
         competitor: competitorName
       });
     }

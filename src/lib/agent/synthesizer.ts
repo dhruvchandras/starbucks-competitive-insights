@@ -81,6 +81,90 @@ function synthesizeWithHeuristics(
     }
   }
 
+/**
+ * Format a clean, human-readable executive summary without HTML remnants or repetitive URLs
+ */
+function buildInsightSummary(
+  art: { title: string; competitor: string; category: InsightCategory; source: string; snippet?: string }
+): string {
+  // Clean snippet of any HTML tags or entities
+  const cleanSnippet = (art.snippet || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // If the snippet contains a raw link or is empty or simply matches the title, generate an editorial summary
+  if (!cleanSnippet || cleanSnippet.includes('http') || cleanSnippet.toLowerCase() === art.title.toLowerCase()) {
+    const cleanTitle = art.title.replace(/[\.\:\-\s]+$/, '');
+    if (art.category === 'restaurant_tech') {
+      return `${art.competitor} is accelerating store-level and drive-thru technology investments as detailed in recent reporting by ${art.source} ("${cleanTitle}"). The development highlights intensified competition around drive-thru throughput and digital queue efficiency.`;
+    }
+    if (art.category === 'product_launch') {
+      return `${art.competitor} has introduced or expanded high-profile beverage and menu innovations reported by ${art.source} ("${cleanTitle}"). The launch directly contests peak morning and afternoon cold drink dayparts.`;
+    }
+    if (art.category === 'store_design') {
+      return `${art.competitor} is advancing new retail footprints and high-velocity store formats reported by ${art.source} ("${cleanTitle}"). The concept emphasizes drive-thru accessibility, reduced capital expenditure, and streamlined order pickup.`;
+    }
+    if (art.category === 'pricing_value') {
+      return `${art.competitor} is escalating value-tier competition reported by ${art.source} ("${cleanTitle}"). The move pressures morning food-and-beverage basket sizes and targets price-sensitive breakfast commuters.`;
+    }
+    if (art.category === 'policy_labor') {
+      return `${art.competitor} is restructuring operational or loyalty reward rules reported by ${art.source} ("${cleanTitle}"). The changes directly impact customer retention frequency and frontline service dynamics.`;
+    }
+    return `${art.competitor} is advancing a key market initiative reported by ${art.source} ("${cleanTitle}"). This development represents an active maneuver to capture local beverage market share.`;
+  }
+
+  return cleanSnippet;
+}
+
+/**
+ * Generate an executive lede headline without awkward mid-word truncation
+ */
+function generateExecutiveHeadline(insights: InsightItem[]): string {
+  if (!insights || insights.length === 0) {
+    return 'Daily Intelligence Dispatch: Competitor Moves Across US Coffee & QSR Verticals';
+  }
+
+  const primary = insights[0];
+  const cleanTitle = primary.title.trim().replace(/[\.\:\-\s]+$/, '');
+  const compFirstWord = primary.competitor.split(' ')[0].toLowerCase();
+  const titleLower = cleanTitle.toLowerCase();
+
+  let lead = cleanTitle;
+  if (!titleLower.includes(compFirstWord)) {
+    lead = `${primary.competitor}: ${cleanTitle}`;
+  }
+
+  // If there is a secondary competitor insight, craft an executive multi-brand dispatch title
+  if (insights.length > 1 && insights[1].competitor !== primary.competitor) {
+    const secondary = insights[1];
+    const secTitle = secondary.title.trim().replace(/[\.\:\-\s]+$/, '');
+    const secCompFirst = secondary.competitor.split(' ')[0].toLowerCase();
+    const secPart = secTitle.toLowerCase().includes(secCompFirst)
+      ? secTitle
+      : `${secondary.competitor} Advances Competitive Push`;
+
+    if (lead.length + secPart.length <= 135) {
+      return `${lead} While ${secPart}`;
+    }
+  }
+
+  // If headline is exceptionally long, truncate strictly at a clean word boundary
+  if (lead.length > 130) {
+    const cut = lead.slice(0, 125);
+    const lastSpace = cut.lastIndexOf(' ');
+    return `${lastSpace > 0 ? cut.slice(0, lastSpace) : cut}...`;
+  }
+
+  return lead;
+}
+
   // Construct insights with tailored strategic analysis
   const insights: InsightItem[] = selectedArticles.map((art, idx) => {
     const rank = (idx + 1) as 1 | 2 | 3;
@@ -103,6 +187,8 @@ function synthesizeWithHeuristics(
       recommendedAction = `Evaluate modular, pickup-first store designs in high-traffic urban transit hubs and suburban highway exits where full cafe real estate is constrained.`;
     }
 
+    const summary = buildInsightSummary(art);
+
     return {
       id: `ins-live-${Date.now()}-${rank}`,
       rank,
@@ -110,7 +196,7 @@ function synthesizeWithHeuristics(
       competitor: art.competitor,
       category: art.category,
       date: dateStr,
-      summary: art.snippet || `${art.competitor} has made a notable strategic move in the market reported by ${art.source}. This initiative targets consumer beverage occasions and competitive convenience.`,
+      summary,
       starbucksImpact,
       recommendedAction,
       threatLevel: art.threatLevel,
@@ -128,14 +214,14 @@ function synthesizeWithHeuristics(
     };
   });
 
+  const headline = generateExecutiveHeadline(insights);
+
   return {
     id: `briefing-${dateStr}-${Date.now()}`,
     date: dateStr,
     displayDate,
     volumeNumber: Math.floor((today.getTime() - new Date('2026-01-01').getTime()) / (1000 * 60 * 60 * 24)),
-    headline: insights[0]
-      ? `${insights[0].competitor} Makes Key Strategic Move: ${insights[0].title.slice(0, 75)}...`
-      : 'Daily Intelligence Dispatch: Competitor Moves Across US Coffee & QSR Verticals',
+    headline,
     executiveSummary: `Today’s automated intelligence scan reviewed ${articles.length} news signals across ${scannedCount} national and regional competitors. Competitive activity is predominantly concentrated in drive-thru velocity, functional cold beverage additions, and aggressive value meal promotions designed to pressure Starbucks' morning and afternoon daypart dominance.`,
     insights,
     scannedCompetitorCount: scannedCount,
